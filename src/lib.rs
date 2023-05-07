@@ -35,9 +35,9 @@ pub struct WoojinVariable {
   pub is_mut: bool
 }
 
-pub type NomResult<'a, T> = IResult<&'a str, T>;
+pub(crate) type NomResult<'a, T> = IResult<&'a str, T>;
 lazy_static!{
-  pub static ref VARS: Arc<Mutex<HashMap<String, WoojinVariable>>> = {
+  pub(crate) static ref VARS: Arc<Mutex<HashMap<String, WoojinVariable>>> = {
     Arc::new(Mutex::new(HashMap::new()))
   };
 }
@@ -60,14 +60,14 @@ pub fn exec(stmt: &Statements) -> Result<WoojinValue, crate::error::WoojinError>
       std::io::stdout().flush().unwrap();
     },
     Statements::Input(val) => {
-      let mut input = String::new();
+      let mut input: String = String::new();
       exec(&Statements::Print(vec![Box::new(Statements::Value(exec(val.clone())?))]))?;
       std::io::stdin().read_line(&mut input).unwrap();
       return Ok(WoojinValue::String(input.trim().to_string()));
     },
     Statements::DecVar(name, value, is_mut) => {
-      let mut vars = VARS.lock().unwrap();
-      if vars.contains_key(name) { error(&format!("변수 {}가 이미 선언되었습니다", name)); }
+      let mut vars: std::sync::MutexGuard<HashMap<String, WoojinVariable>> = VARS.lock().unwrap();
+      if vars.contains_key(name) { error(&format!("Variable {} is already declared", name)); }
       vars.insert(name.clone(), WoojinVariable { value: exec(&value)?, is_mut: *is_mut });
     },
     Statements::Calc(calc) => { return check_calc(calc.clone()); },
@@ -90,12 +90,12 @@ pub fn error(msg: &impl ToString) -> ! {
   process::exit(1);
 }
 
-pub fn check_calc(calc: Calc) -> WoojinResult<WoojinValue> {
+pub(crate) fn check_calc(calc: Calc) -> WoojinResult<WoojinValue> {
   match calc {
     Calc::Add(a, b) => Ok(check_calc(*a)?.add(&check_calc(*b)?)?),
-    Calc::Sub(a, b) => Ok(check_calc(*a)?.sub(&check_calc(*b)?)?), // 빼기 연산
-    Calc::Mul(a, b) => Ok(check_calc(*a)?.mul(&check_calc(*b)?)?), // 곱하기 연산
-    Calc::Div(a, b) => Ok(check_calc(*a)?.div(&check_calc(*b)?)?), // 나누기 연산
+    Calc::Sub(a, b) => Ok(check_calc(*a)?.sub(&check_calc(*b)?)?),
+    Calc::Mul(a, b) => Ok(check_calc(*a)?.mul(&check_calc(*b)?)?),
+    Calc::Div(a, b) => Ok(check_calc(*a)?.div(&check_calc(*b)?)?),
     Calc::Value(val) => return Ok(val.clone()),
   }
 }

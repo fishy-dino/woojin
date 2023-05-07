@@ -1,8 +1,5 @@
 use std::{process, io::{Read}};
 use woojin::{error, exec, Statements};
-use nom::{IResult};
-
-pub type NomResult<'a, T> = IResult<&'a str, T>;
 
 fn main() {
   let args: Vec<String> = std::env::args().collect::<Vec<String>>();
@@ -19,14 +16,14 @@ fn main() {
 }
 
 fn read_file(path: &str) -> std::io::Result<String> {
-  let mut file = std::fs::File::open(path)?;
-  let mut contents = String::new();
+  let mut file: std::fs::File = std::fs::File::open(path)?;
+  let mut contents: String = String::new();
   file.read_to_string(&mut contents)?;
   Ok(contents)
 }
 
 fn run(code: impl ToString) {
-  let lines = code.to_string()
+  let lines: Vec<String> = code.to_string()
     .replace(";", "\n")
     .split("\n")
     .map(|a| a.trim().to_string())

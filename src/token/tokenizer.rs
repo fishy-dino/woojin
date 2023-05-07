@@ -19,14 +19,13 @@ use nom::{
   combinator::{map, map_res, opt, value}
 };
 
-pub type ParseResult<'a, T> = IResult<&'a str, T>;
-pub type WoojinResult<T> = Result<T, crate::error::WoojinError>;
+pub(crate) type WoojinResult<T> = Result<T, crate::error::WoojinError>;
 
-fn parse_int(input: &str) -> Result<i32, std::num::ParseIntError> {
+pub(crate) fn parse_int(input: &str) -> Result<i32, std::num::ParseIntError> {
   i32::from_str_radix(input, 10)
 }
 
-pub fn yee(input: &str) -> NomResult<Statements> {
+pub(crate) fn yee(input: &str) -> NomResult<Statements> {
   let (input, _) = tag("yee ")(input)?;
   let (input, sign) = opt(tag("-"))(input)?;
   let (input, num) = map_res(take_while_m_n(1, 10, |c: char| c.is_digit(10)), parse_int)(input)?;
@@ -34,7 +33,7 @@ pub fn yee(input: &str) -> NomResult<Statements> {
   Ok((input, Statements::Exit(num)))
 }
 
-fn vec2stmt(values: &Vec<&str>) -> WoojinResult<Vec<Box<Statements>>> {
+pub(crate) fn vec2stmt(values: &Vec<&str>) -> WoojinResult<Vec<Box<Statements>>> {
   let mut result: Vec<Box<Statements>> = vec![];
   for value in values {
     println!("value: {}", value);
@@ -44,9 +43,8 @@ fn vec2stmt(values: &Vec<&str>) -> WoojinResult<Vec<Box<Statements>>> {
   Ok(result)
 }
 
-fn split_comma(input: &str) -> WoojinResult<Vec<&str>> {
+pub(crate) fn split_comma(input: &str) -> WoojinResult<Vec<&str>> {
   let values: Vec<&str> = if input.trim().contains(",") {
-    // 따옴표 안에 있는 쉼표는 구분자로 사용하지 않도록 처리
     let mut in_quotes = false;
     let mut start = 0;
     let mut result = vec![];
@@ -72,7 +70,7 @@ fn split_comma(input: &str) -> WoojinResult<Vec<&str>> {
   Ok(values)
 }
 
-fn print(input: &str) -> WoojinResult<Statements> {
+pub(crate) fn print(input: &str) -> WoojinResult<Statements> {
   let input = match tag::<&str, _, nom::error::Error<&str>>("print ")(input) {
     Ok((input, _)) => input.trim(),
     Err(_) => return Err(WoojinError::new("Invalid usage of print"))
@@ -81,7 +79,7 @@ fn print(input: &str) -> WoojinResult<Statements> {
   Ok(Statements::Print(vec2stmt(&values)?))
 }
 
-fn println(input: &str) -> WoojinResult<Statements> {
+pub(crate) fn println(input: &str) -> WoojinResult<Statements> {
   let input = match tag::<&str, _, nom::error::Error<&str>>("println ")(input) {
     Ok((input, _)) => input.trim(),
     Err(_) => return Err(WoojinError::new("Invalid usage of println"))
@@ -90,7 +88,7 @@ fn println(input: &str) -> WoojinResult<Statements> {
   Ok(Statements::Println(vec2stmt(&values)?))
 }
 
-fn roar(input: &str) -> WoojinResult<Statements> {
+pub(crate) fn roar(input: &str) -> WoojinResult<Statements> {
   let input = match tag::<&str, _, nom::error::Error<&str>>("roar ")(input) {
     Ok((input, _)) => input,
     Err(_) => return Err(WoojinError::new("Invalid usage of roar"))
@@ -98,7 +96,7 @@ fn roar(input: &str) -> WoojinResult<Statements> {
   Ok(Statements::Roar(test(input)?))
 }
 
-fn input(i: &str) -> WoojinResult<Statements> {
+pub(crate) fn input(i: &str) -> WoojinResult<Statements> {
   let input = match tag::<&str, _, nom::error::Error<&str>>("input ")(i) {
     Ok((input, _)) => input,
     Err(_) => return Err(WoojinError::new("Invalid usage of input"))
@@ -106,7 +104,7 @@ fn input(i: &str) -> WoojinResult<Statements> {
   Ok(Statements::Input(Box::new(tokenizer(&input.to_string())?)))
 }
 
-fn sleep(i: &str) -> WoojinResult<Statements> {
+pub(crate) fn sleep(i: &str) -> WoojinResult<Statements> {
   let input = match tag::<&str, _, nom::error::Error<&str>>("sleep ")(i) {
     Ok((input, _)) => input,
     Err(_) => return Err(WoojinError::new("Invalid usage of sleep"))
@@ -114,7 +112,7 @@ fn sleep(i: &str) -> WoojinResult<Statements> {
   Ok(Statements::Sleep(Box::new(tokenizer(&input.to_string())?)))
 }
 
-fn parse_variable(input: &str) -> IResult<&str, (String, &str, bool)> {
+pub(crate) fn parse_variable(input: &str) -> IResult<&str, (String, &str, bool)> {
   let (input, _) = multispace0(input)?;
   let (input, mutable) = alt((
     value(true, preceded(tag("let"), preceded(multispace1, tag("mut")))),
@@ -141,7 +139,7 @@ fn parse_variable(input: &str) -> IResult<&str, (String, &str, bool)> {
   Ok((input, (var_name.to_string(), input, mutable)))
 }
 
-fn test(input: &str) -> WoojinResult<WoojinValue> {
+pub(crate) fn test(input: &str) -> WoojinResult<WoojinValue> {
   match tokenizer(&input.to_string())? {
     Statements::Value(val) => Ok(val),
     a => match exec(&a) {
@@ -151,7 +149,7 @@ fn test(input: &str) -> WoojinResult<WoojinValue> {
   }
 }
 
-pub fn parse_variable_name(input: &str) -> IResult<&str, String> {
+pub(crate) fn parse_variable_name(input: &str) -> IResult<&str, String> {
   let (input, a) = preceded(char('$'), take_while1(|c: char| c.is_ascii_alphanumeric() || c == '_'))(input)?;
   Ok((input, a.to_string()))
 }
@@ -165,7 +163,7 @@ pub enum Calc {
   Div(Box<Calc>, Box<Calc>),
 }
 
-fn parse_primary(input: &str) -> IResult<&str, Calc> {
+pub(crate) fn parse_primary(input: &str) -> IResult<&str, Calc> {
   alt((
     map(parse_value, Calc::Value),
     delimited(
@@ -176,7 +174,7 @@ fn parse_primary(input: &str) -> IResult<&str, Calc> {
   ))(input)
 }
 
-fn parse_term(input: &str) -> IResult<&str, Calc> {
+pub(crate) fn parse_term(input: &str) -> IResult<&str, Calc> {
   let (input, init) = parse_primary(input)?;
   fold_many0(
     pair(alt((tag("*"), tag("/"))), parse_primary),
@@ -189,7 +187,7 @@ fn parse_term(input: &str) -> IResult<&str, Calc> {
   )(input)
 }
 
-fn parse_expr(input: &str) -> IResult<&str, Calc> {
+pub(crate) fn parse_expr(input: &str) -> IResult<&str, Calc> {
   let (input, init) = parse_term(input)?;
   fold_many0(
     pair(alt((tag("+"), tag("-"))), parse_term),
@@ -203,7 +201,7 @@ fn parse_expr(input: &str) -> IResult<&str, Calc> {
 }
 
 
-pub fn parse_calc(input: &str) -> IResult<&str, Calc> {
+pub(crate) fn parse_calc(input: &str) -> IResult<&str, Calc> {
   delimited(space0, parse_expr, space0)(input)
 }
 
