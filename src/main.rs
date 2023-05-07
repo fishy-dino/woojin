@@ -1,12 +1,9 @@
-use std::{process, io::{Read}};
+use std::{io::{Read}};
 use woojin::{error, exec, Statements};
 
 fn main() {
   let args: Vec<String> = std::env::args().collect::<Vec<String>>();
-  if args.len() < 2 {
-    eprintln!("Usage: woojin [file]");
-    process::exit(1);
-  }
+  if args.len() < 2 { error(&"Usage: woojin [file]"); }
   let path: &String = &args[1];
   let code: String = match read_file(path) {
     Ok(code) => code,
@@ -16,6 +13,7 @@ fn main() {
 }
 
 fn read_file(path: &str) -> std::io::Result<String> {
+  if !path.ends_with(".wj") { error(&"Error: file extension must be .wj"); }
   let mut file: std::fs::File = std::fs::File::open(path)?;
   let mut contents: String = String::new();
   file.read_to_string(&mut contents)?;
@@ -38,7 +36,7 @@ fn run(code: impl ToString) {
     }
   }
   for stmt in program.statements.iter() {
-    if let Err(err) = exec(stmt) { error(&err); }
+    if let Err(err) = exec(stmt) { err.exit(); }
   }
 }
 struct Program { statements: Vec<Statements> }

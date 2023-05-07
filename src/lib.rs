@@ -8,10 +8,7 @@ use std::{
   process,
   io::{Write}, sync::{Arc, Mutex}, collections::HashMap,
 };
-
-use nom::{
-  IResult
-};
+use nom::{IResult};
 use value::{WoojinValue, ValueCalc};
 
 #[derive(Debug)]
@@ -86,7 +83,7 @@ pub fn exec(stmt: &Statements) -> Result<WoojinValue, crate::error::WoojinError>
 }
 
 pub fn error(msg: &impl ToString) -> ! {
-  eprintln!("Error: {}", msg.to_string());
+  eprintln!("\x1b[1m\x1b[31mWJ\x1b[0m: {}", msg.to_string());
   process::exit(1);
 }
 

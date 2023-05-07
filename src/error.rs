@@ -19,13 +19,18 @@ impl WoojinError {
       kind: WoojinErrorKind::Unknown
     }
   }
+
+  pub fn exit(&self) -> ! {
+    println!("{}", self);
+    std::process::exit(1);
+  }
 }
 
 impl Error for WoojinError {}
 
 impl std::fmt::Display for WoojinError {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-    write!(f,"WJ{}: {}", self.kind as i32, self.details)
+    write!(f,"\x1b[1m\x1b[31mWJ{}\x1b[0m: {}", self.kind as i32, self.details)
   }
 }
 
