@@ -1,0 +1,20 @@
+[package]
+name = "woojin"
+authors = ["teamfishydino <teamfishydino@gmail.com>"]
+version = "0.1.0"
+license = "AGPL-3.0"
+readme = "README.md"
+description = "Woojinlang interpreter written as Rust"
+edition = "2021"
+homepage = "https://github.com/teamfishydino/woojin/"
+repository = "https://github.com/teamfishydino/woojin/"
+keywords = ["woojin", "language", "esolang", "woojinlang", "fishydino"]
+categories = ["compilers"]
+
+[badges]
+maintenance = { status = "actively-developed" }
+
+[dependencies]
+nom = "7.1.0"
+regex = "1.8.1"
+lazy_static = "1.4.0"
