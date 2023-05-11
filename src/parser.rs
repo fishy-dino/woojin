@@ -1,6 +1,6 @@
 use crate::{
-  Statements,
-  NomResult, value::{WoojinValue, parse_value}, error::WoojinError, exec
+  ast::Statements,
+  NomResult, types::{WoojinValue, parse::parse_value}, error::WoojinError, variable::VariableOption, exec
 };
 
 use nom::{
@@ -30,13 +30,12 @@ pub(crate) fn yee(input: &str) -> NomResult<Statements> {
   let (input, sign) = opt(tag("-"))(input)?;
   let (input, num) = map_res(take_while_m_n(1, 10, |c: char| c.is_digit(10)), parse_int)(input)?;
   let num = if let Some(_) = sign { -num } else { num };
-  Ok((input, Statements::Exit(num)))
+  Ok((input, Statements::Yee { code: num }))
 }
 
 pub(crate) fn vec2stmt(values: &Vec<&str>) -> WoojinResult<Vec<Box<Statements>>> {
   let mut result: Vec<Box<Statements>> = vec![];
   for value in values {
-    println!("value: {}", value);
     let val = tokenizer(value)?;
     result.push(Box::new(val));
   };
@@ -73,43 +72,43 @@ pub(crate) fn split_comma(input: &str) -> WoojinResult<Vec<&str>> {
 pub(crate) fn print(input: &str) -> WoojinResult<Statements> {
   let input = match tag::<&str, _, nom::error::Error<&str>>("print ")(input) {
     Ok((input, _)) => input.trim(),
-    Err(_) => return Err(WoojinError::new("Invalid usage of print"))
+    Err(_) => return Err(WoojinError::new("Invalid usage of print", crate::error::WoojinErrorKind::Unknown))
   };
   let values: Vec<&str> = split_comma(input)?;
-  Ok(Statements::Print(vec2stmt(&values)?))
+  Ok(Statements::Print { values: vec2stmt(&values)? })
 }
 
 pub(crate) fn println(input: &str) -> WoojinResult<Statements> {
   let input = match tag::<&str, _, nom::error::Error<&str>>("println ")(input) {
     Ok((input, _)) => input.trim(),
-    Err(_) => return Err(WoojinError::new("Invalid usage of println"))
+    Err(_) => return Err(WoojinError::new("Invalid usage of println", crate::error::WoojinErrorKind::Unknown))
   };
   let values: Vec<&str> = split_comma(input)?;
-  Ok(Statements::Println(vec2stmt(&values)?))
+  Ok(Statements::Println{ values: vec2stmt(&values)? })
 }
 
 pub(crate) fn roar(input: &str) -> WoojinResult<Statements> {
   let input = match tag::<&str, _, nom::error::Error<&str>>("roar ")(input) {
     Ok((input, _)) => input,
-    Err(_) => return Err(WoojinError::new("Invalid usage of roar"))
+    Err(_) => return Err(WoojinError::new("Invalid usage of roar", crate::error::WoojinErrorKind::Unknown))
   };
-  Ok(Statements::Roar(test(input)?))
+  Ok(Statements::Roar { value: test(input)? })
 }
 
 pub(crate) fn input(i: &str) -> WoojinResult<Statements> {
   let input = match tag::<&str, _, nom::error::Error<&str>>("input ")(i) {
     Ok((input, _)) => input,
-    Err(_) => return Err(WoojinError::new("Invalid usage of input"))
+    Err(_) => return Err(WoojinError::new("Invalid usage of input", crate::error::WoojinErrorKind::Unknown))
   };
-  Ok(Statements::Input(Box::new(tokenizer(&input.to_string())?)))
+  Ok(Statements::Input { question: Box::new(tokenizer(&input.to_string())?) })
 }
 
 pub(crate) fn sleep(i: &str) -> WoojinResult<Statements> {
   let input = match tag::<&str, _, nom::error::Error<&str>>("sleep ")(i) {
     Ok((input, _)) => input,
-    Err(_) => return Err(WoojinError::new("Invalid usage of sleep"))
+    Err(_) => return Err(WoojinError::new("Invalid usage of sleep", crate::error::WoojinErrorKind::Unknown))
   };
-  Ok(Statements::Sleep(Box::new(tokenizer(&input.to_string())?)))
+  Ok(Statements::Sleep { value: Box::new(tokenizer(&input.to_string())?) })
 }
 
 pub(crate) fn parse_variable(input: &str) -> IResult<&str, (String, &str, bool)> {
@@ -139,9 +138,46 @@ pub(crate) fn parse_variable(input: &str) -> IResult<&str, (String, &str, bool)>
   Ok((input, (var_name.to_string(), input, mutable)))
 }
 
+pub(crate) fn parse_assignment(input: &str) -> IResult<&str, (String, &str, String)> {
+  let (input, _) = multispace0(input)?;
+  let (input, var_name) = map(
+    pair(
+      preceded(char('$'), take_while1(|c: char| c.is_ascii_alphanumeric() || c == '_')),
+      many0(preceded(multispace1, take_while1(|c: char| c.is_ascii_alphanumeric() || c == '_'))),
+    ),
+    |(first, rest)| {
+      let mut name = String::from(first);
+      for s in rest {
+        name.push(' ');
+        name.push_str(s);
+      }
+      name
+    },
+  )(input)?;
+  let (input, _) = multispace0(input)?;
+  let (input, _) = char('=')(input)?;
+  let (input, _) = multispace0(input)?;
+  let (input, value) = map(
+    pair(
+      take_while1(|c: char| c.is_ascii_alphanumeric() || c == '_'),
+      many0(preceded(multispace1, take_while1(|c: char| c.is_ascii_alphanumeric() || c == '_'))),
+    ),
+    |(first, rest)| {
+      let mut val = String::from(first);
+      for s in rest {
+        val.push(' ');
+        val.push_str(s);
+      }
+      val
+    },
+  )(input)?;
+  let (input, _) = multispace0(input)?;
+  Ok((input, (var_name.to_string(), input, value.to_string())))
+}
+
 pub(crate) fn test(input: &str) -> WoojinResult<WoojinValue> {
   match tokenizer(&input.to_string())? {
-    Statements::Value(val) => Ok(val),
+    Statements::Value { value: val } => Ok(val),
     a => match exec(&a) {
       Ok(val) => Ok(val),
       Err(e) => Err(e)
@@ -155,7 +191,7 @@ pub(crate) fn parse_variable_name(input: &str) -> IResult<&str, String> {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Calc {
+pub(crate) enum Calc {
   Value(WoojinValue),
   Add(Box<Calc>, Box<Calc>),
   Sub(Box<Calc>, Box<Calc>),
@@ -205,10 +241,10 @@ pub(crate) fn parse_calc(input: &str) -> IResult<&str, Calc> {
   delimited(space0, parse_expr, space0)(input)
 }
 
-pub fn tokenizer(line: &impl ToString) -> Result<Statements, crate::error::WoojinError> {
+pub(crate) fn tokenizer(line: &impl ToString) -> Result<Statements, crate::error::WoojinError> {
   let line = line.to_string().trim().to_string();
   match line {
-    line if line == "" => Ok(Statements::Value(WoojinValue::String("".to_string()))),
+    line if line == "" => Ok(Statements::Value { value: WoojinValue::String("".to_string()) }),
     line if line.starts_with("//") => Ok(Statements::Comment(line[2..].trim().to_string())),
     line if line.starts_with("yee") => match yee(&line)? { (_, a) => { return Ok(a); }, }
     line if line.starts_with("println") => Ok(println(&line)?),
@@ -219,18 +255,27 @@ pub fn tokenizer(line: &impl ToString) -> Result<Statements, crate::error::Wooji
     line if line.starts_with("let") => {
       let (_, (var_name, input, mutable)) = parse_variable(&line)?;
       let stmts = tokenizer(&input.to_string())?;
-      Ok(Statements::DecVar(var_name, Box::new(stmts), mutable))
+      Ok(Statements::Let {
+        name: var_name,
+        stmt: Box::new(stmts),
+        option: VariableOption::new(Some(mutable), None)
+      })
+    },
+    line if line.starts_with("$") && line.contains("=") => {
+      let (_, (var_name, _, value)) = parse_assignment(&line)?;
+      let stmts = tokenizer(&value.to_string())?;
+      Ok(Statements::Assignment { name: var_name, value: Box::new(stmts) })
     },
     _ => match parse_calc(line.as_str()) {
       Ok(val) => {
         match val.1 {
-          Calc::Value(a) => Ok(Statements::Value(a)),
+          Calc::Value(a) => Ok(Statements::Value {value: a}),
           _ => Ok(Statements::Calc(val.1))
         }
       },
       _ => match parse_value(line.as_str()) {
-        Ok(val) => Ok(Statements::Value(val.1)),
-        Err(_) => Err(WoojinError::new(format!("Unknown token \"{}\"", line)))
+        Ok(val) => Ok(Statements::Value {value: val.1}),
+        Err(_) => Err(WoojinError::new(format!("Unknown token \"{}\"", line), crate::error::WoojinErrorKind::UnknownToken))
       }
     }
   }

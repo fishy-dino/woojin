@@ -2,8 +2,17 @@ use std::error::Error;
 
 #[derive(Debug, Copy, Clone)]
 pub enum WoojinErrorKind {
+  Roar,
   Success,
-  Unknown
+  Unknown,
+  UnknownToken,
+  FileNotFound,
+  UnsupportedExtension,
+  FailReadFailure,
+  UndeclaredVariable,
+  VariableAlreadyDeclared,
+  VariableNotMutable,
+  ParseError
 }
 
 #[derive(Debug)]
@@ -13,10 +22,10 @@ pub struct WoojinError {
 }
 
 impl WoojinError {
-  pub fn new(msg: impl ToString) -> WoojinError {
+  pub fn new(msg: impl ToString, kind: WoojinErrorKind) -> WoojinError {
     WoojinError{
       details: msg.to_string(),
-      kind: WoojinErrorKind::Unknown
+      kind
     }
   }
 
@@ -36,6 +45,6 @@ impl std::fmt::Display for WoojinError {
 
 impl<T> From<nom::Err<T>> for WoojinError where T: std::fmt::Debug {
   fn from(err: nom::Err<T>) -> Self {
-    WoojinError::new(format!("parse error: {}", err))
+    WoojinError::new(format!("parse error: {}", err), WoojinErrorKind::ParseError)
   }
 }

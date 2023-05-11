@@ -1,98 +1,75 @@
 pub mod error;
-pub mod token;
-pub mod value;
+pub mod types;
+pub(crate) mod variable;
+pub(crate) mod ast;
+pub(crate) mod parser;
 
-use lazy_static::lazy_static;
-use token::{Calc, WoojinResult};
-use std::{
-  process,
-  io::{Write}, sync::{Arc, Mutex}, collections::HashMap,
-};
-use nom::{IResult};
-use value::{WoojinValue, ValueCalc};
-
-#[derive(Debug)]
-pub enum Statements {
-  Nop,
-  Comment(String),
-  Input(Box<Statements>),
-  Value(WoojinValue),
-  Print(Vec<Box<Statements>>),
-  Println(Vec<Box<Statements>>),
-  Roar(WoojinValue),
-  DecVar(String, Box<Statements>, bool),
-  Calc(Calc),
-  Sleep(Box<Statements>),
-  Exit(i32)
-}
-
-#[derive(Debug)]
-pub struct WoojinVariable {
-  pub value: WoojinValue,
-  pub is_mut: bool
-}
+use std::io::{Write};
+use ast::Statements;
+use error::WoojinError;
+use nom::IResult;
+use types::WoojinValue;
 
 pub(crate) type NomResult<'a, T> = IResult<&'a str, T>;
-lazy_static!{
-  pub(crate) static ref VARS: Arc<Mutex<HashMap<String, WoojinVariable>>> = {
-    Arc::new(Mutex::new(HashMap::new()))
-  };
+// pub(crate) type StdString = std::string::String;
+
+pub(crate) struct Program { statements: Vec<self::ast::Statements> }
+impl Program { pub fn new() -> Program { Program{ statements: Vec::new() } } }
+pub fn run(lines: Vec<String>) {
+  let mut program: Program = Program::new();
+  for line in lines {
+    let res: Result<Statements, error::WoojinError> = crate::parser::tokenizer(&line);
+    match res {
+      Ok(v) => {program.statements.push(v)},
+      Err(err) => { err.exit(); }
+    }
+  }
+  for stmt in program.statements.iter() { if let Err(err) = exec(stmt) { err.exit(); } }
 }
 
-pub fn exec(stmt: &Statements) -> Result<WoojinValue, crate::error::WoojinError> {
+pub(crate) fn exec(stmt: &Statements) -> Result<WoojinValue, crate::error::WoojinError> {
   match stmt {
-    Statements::Exit(num) => { std::process::exit(*num); },
-    Statements::Print(values) => {
+    Statements::Yee { code } => { std::process::exit(*code); },
+    Statements::Roar { value } => { WoojinError::new(&value.to_print(), error::WoojinErrorKind::Roar); },
+    Statements::Print { values } => {
       for (i, value) in values.iter().enumerate() {
         print!("{}", exec(value)?.to_print());
         if i != values.len() - 1 { print!(" "); }
       }
       std::io::stdout().flush().unwrap();
     },
-    Statements::Println(values) => {
+    Statements::Println { values } => {
       for (i, value) in values.iter().enumerate() {
         print!("{}", exec(value)?.to_print());
         if i != values.len() - 1 { print!(" "); } else { print!("\n"); }
       }
       std::io::stdout().flush().unwrap();
     },
-    Statements::Input(val) => {
+    Statements::Input { question } => {
       let mut input: String = String::new();
-      exec(&Statements::Print(vec![Box::new(Statements::Value(exec(val.clone())?))]))?;
+      if let Err(e) = exec(&Statements::Print{ values: vec![question.clone()] }) {
+        e.exit();
+      }
       std::io::stdin().read_line(&mut input).unwrap();
       return Ok(WoojinValue::String(input.trim().to_string()));
     },
-    Statements::DecVar(name, value, is_mut) => {
-      let mut vars: std::sync::MutexGuard<HashMap<String, WoojinVariable>> = VARS.lock().unwrap();
-      if vars.contains_key(name) { error(&format!("Variable {} is already declared", name)); }
-      vars.insert(name.clone(), WoojinVariable { value: exec(&value)?, is_mut: *is_mut });
-    },
-    Statements::Calc(calc) => { return check_calc(calc.clone()); },
-    Statements::Roar(val) => error(&val.to_print()),
-    Statements::Value(val) => return Ok(val.clone()),
-    Statements::Sleep(val) => {
-      match exec(&**val)? {
+    Statements::Sleep { value } => {
+      match exec(&**value)? {
         WoojinValue::Int(num) => std::thread::sleep(std::time::Duration::from_millis(num as u64)),
-        _ => error(&"The param of the sleep function must be an integer")
+        _ => WoojinError::new("The param of the sleep function must be an integer", error::WoojinErrorKind::Unknown).exit()
       }
     },
-    Statements::Nop => {}
+    Statements::Assignment { name, value } => { variable::change_var(name.as_str(), &value)?; },
+    Statements::Let { name, stmt, option } => { 
+      let value: WoojinValue = exec(stmt)?;
+      variable::dec_var(name.as_str(), &value, option)?;
+    },
+    // Statements::If { condition: _, body: _ } => {}, 
+    Statements::Value { value } => {
+      return Ok(value.value().clone())
+    },
+    Statements::Calc(_) => {},
     Statements::Comment(_) => {}
   }
   Ok(WoojinValue::Unit)
-}
-
-pub fn error(msg: &impl ToString) -> ! {
-  eprintln!("\x1b[1m\x1b[31mWJ\x1b[0m: {}", msg.to_string());
-  process::exit(1);
-}
-
-pub(crate) fn check_calc(calc: Calc) -> WoojinResult<WoojinValue> {
-  match calc {
-    Calc::Add(a, b) => Ok(check_calc(*a)?.add(&check_calc(*b)?)?),
-    Calc::Sub(a, b) => Ok(check_calc(*a)?.sub(&check_calc(*b)?)?),
-    Calc::Mul(a, b) => Ok(check_calc(*a)?.mul(&check_calc(*b)?)?),
-    Calc::Div(a, b) => Ok(check_calc(*a)?.div(&check_calc(*b)?)?),
-    Calc::Value(val) => return Ok(val.clone()),
-  }
 }
