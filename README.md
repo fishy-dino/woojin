@@ -11,7 +11,7 @@
 [![](https://img.shields.io/github/issues-pr/teamfishydino/woojin)](https://github.com/teamfishydino/woojin)
 [![](https://img.shields.io/github/issues-pr-closed/teamfishydino/woojin)](https://github.com/teamfishydino/woojin)
 
-This is Woojinlang interpreter written in Rust(Current v0.1.0).<br/>
+This is Woojinlang interpreter written in Rust(Current v0.1.x).<br/>
 The Woojinlang project is a project that was started as a joke to tease my friend. Do not use this language in your projects.<br/>
 The **0.x.x** version is an unofficial version. Current grammar may not be compatible with the official version (>=1.x.x)<br/>
 
