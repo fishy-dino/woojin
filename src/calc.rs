@@ -3,7 +3,7 @@ use nom::{
   branch::{alt},
   multi::{fold_many0},
   bytes::complete::{ tag },
-  character::complete::{ char, space0, digit1 },
+  character::complete::{ char, space0 },
   sequence::{pair, delimited},
   combinator::{map}
 };
