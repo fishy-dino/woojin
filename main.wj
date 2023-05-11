@@ -1,2 +1,3 @@
-println 2 + 4;
+println 2 + 4, 4*20
+println "F" * 3;
 yee 0;

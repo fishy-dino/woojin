@@ -7,7 +7,7 @@ use nom::{
   sequence::{pair, delimited},
   combinator::{map}
 };
-use crate::{types::WoojinValue, parser::WoojinResult, error::WoojinError};
+use crate::{types::{WoojinValue, parse::parse_value}, parser::WoojinResult, error::WoojinError};
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum Calc {
@@ -20,11 +20,7 @@ pub(crate) enum Calc {
 
 pub(crate) fn parse_primary(input: &str) -> IResult<&str, Calc> {
   alt((
-    map(digit1, |digits: &str| {
-      let value = digits.parse().unwrap();
-      let woojin_value = WoojinValue::Int(value);
-      Calc::Value(woojin_value)
-    }),
+    map(parse_value, |value| { Calc::Value(value) }),
     delimited(
       char('('),
       delimited(space0, parse_expr, space0),
@@ -78,6 +74,8 @@ impl ValueCalc for WoojinValue {
     match (self, other.value()) {
       (WoojinValue::Int(a), WoojinValue::Int(b)) => Ok(WoojinValue::Int(a + b)),
       (WoojinValue::Float(a), WoojinValue::Float(b)) => Ok(WoojinValue::Float(a + b)),
+      (WoojinValue::Float(a), WoojinValue::Int(b)) => Ok(WoojinValue::Float(a + (b as f32))),
+      (WoojinValue::Int(a), WoojinValue::Float(b)) => Ok(WoojinValue::Float((*a as f32) + b)),
       (WoojinValue::String(a), WoojinValue::String(b)) => Ok(WoojinValue::String(format!("{}{}", a, b))),
       _ => Err(WoojinError::new("The type that can't be added", crate::error::WoojinErrorKind::CannotAdd)),
     }  
@@ -87,6 +85,8 @@ impl ValueCalc for WoojinValue {
     match (self, other.value()) {
       (WoojinValue::Int(a), WoojinValue::Int(b)) => Ok(WoojinValue::Int(a - b)),
       (WoojinValue::Float(a), WoojinValue::Float(b)) => Ok(WoojinValue::Float(a - b)),
+      (WoojinValue::Float(a), WoojinValue::Int(b)) => Ok(WoojinValue::Float(a - (b as f32))),
+      (WoojinValue::Int(a), WoojinValue::Float(b)) => Ok(WoojinValue::Float((*a as f32) - b)),
       _ => Err(WoojinError::new("The type that can't be subtracted", crate::error::WoojinErrorKind::CannotSubtract)),
     }  
   }
@@ -95,22 +95,22 @@ impl ValueCalc for WoojinValue {
     match (self, other.value()) {
       (WoojinValue::Int(a), WoojinValue::Int(b)) => Ok(WoojinValue::Int(a * b)),
       (WoojinValue::Float(a), WoojinValue::Float(b)) => Ok(WoojinValue::Float(a * b)),
+      (WoojinValue::Float(a), WoojinValue::Int(b)) => Ok(WoojinValue::Float(a * (b as f32))),
+      (WoojinValue::Int(a), WoojinValue::Float(b)) => Ok(WoojinValue::Float((*a as f32) * b)),
+      (WoojinValue::String(left), WoojinValue::Int(right)) => Ok(WoojinValue::String(left.as_str().repeat(right as usize))),
+      (WoojinValue::String(left), WoojinValue::Long(right)) => Ok(WoojinValue::String(left.as_str().repeat(right as usize))),
       _ => Err(WoojinError::new("The type that can't be multiplied!", crate::error::WoojinErrorKind::CannotMultiply)),
     }
   }
 
   fn div(&self, other: &WoojinValue) -> WoojinResult<WoojinValue> {
+    #[allow(non_snake_case)]
+    let DivisionZeroError = WoojinError::new("It cannot be divided by 0.0", crate::error::WoojinErrorKind::DivisionByZero);
     match (self, other.value()) {
-      (WoojinValue::Int(a), WoojinValue::Int(b)) => {
-        Ok(if b != 0 { WoojinValue::Int(a / b) } else {
-          return Err(WoojinError::new("It cannot be divided by 0", crate::error::WoojinErrorKind::DivisionByZero))
-        })
-      },
-      (WoojinValue::Float(a), WoojinValue::Float(b)) => {
-        Ok(if b != 0.0 { WoojinValue::Float(a / b) } else {
-          return Err(WoojinError::new("It cannot be divided by 0.0", crate::error::WoojinErrorKind::DivisionByZero))
-        })
-      },
+      (WoojinValue::Int(a), WoojinValue::Int(b)) => Ok(if b != 0 { WoojinValue::Int(a / b) } else { return Err(DivisionZeroError) }),
+      (WoojinValue::Float(a), WoojinValue::Float(b)) => Ok(if b != 0.0 { WoojinValue::Float(a / b) } else {return Err(DivisionZeroError)}),
+      (WoojinValue::Float(a), WoojinValue::Int(b)) => Ok(if b != 0 { WoojinValue::Float(a / (b as f32)) } else {return Err(DivisionZeroError)}),
+      (WoojinValue::Int(a), WoojinValue::Float(b)) => Ok(if b != 0.0 { WoojinValue::Float((*a as f32) / b) } else {return Err(DivisionZeroError)}),
       _ => Err(WoojinError::new("an indivisible type!", crate::error::WoojinErrorKind::CannotDivide)),
     }
   }
