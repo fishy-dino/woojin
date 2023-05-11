@@ -3,13 +3,15 @@ pub mod types;
 pub(crate) mod variable;
 pub(crate) mod ast;
 pub(crate) mod parser;
+pub(crate) mod calc;
 
 use std::io::{Write};
 use ast::Statements;
+use calc::{ValueCalc, Calc};
 use error::WoojinError;
 use nom::IResult;
+use parser::{WoojinResult};
 use types::WoojinValue;
-
 pub(crate) type NomResult<'a, T> = IResult<&'a str, T>;
 // pub(crate) type StdString = std::string::String;
 
@@ -25,6 +27,16 @@ pub fn run(lines: Vec<String>) {
     }
   }
   for stmt in program.statements.iter() { if let Err(err) = exec(stmt) { err.exit(); } }
+}
+
+pub(crate) fn check_calc(calc: Calc) -> WoojinResult<WoojinValue> {
+  match calc {
+    Calc::Add(a, b) => Ok(check_calc(*a)?.add(&check_calc(*b)?)?),
+    Calc::Sub(a, b) => Ok(check_calc(*a)?.sub(&check_calc(*b)?)?),
+    Calc::Mul(a, b) => Ok(check_calc(*a)?.mul(&check_calc(*b)?)?),
+    Calc::Div(a, b) => Ok(check_calc(*a)?.div(&check_calc(*b)?)?),
+    Calc::Value(val) => return Ok(val.clone()),
+  }
 }
 
 pub(crate) fn exec(stmt: &Statements) -> Result<WoojinValue, crate::error::WoojinError> {
@@ -68,7 +80,7 @@ pub(crate) fn exec(stmt: &Statements) -> Result<WoojinValue, crate::error::Wooji
     Statements::Value { value } => {
       return Ok(value.value().clone())
     },
-    Statements::Calc(_) => {},
+    Statements::Calc(calc) => { return check_calc(calc.clone()); },
     Statements::Comment(_) => {}
   }
   Ok(WoojinValue::Unit)

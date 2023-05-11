@@ -1,21 +1,19 @@
 use crate::{
   ast::Statements,
-  NomResult, types::{WoojinValue, parse::parse_value}, error::WoojinError, variable::VariableOption, exec
+  NomResult, types::{WoojinValue, parse::parse_value}, error::WoojinError, variable::VariableOption, exec, calc::{parse_calc, Calc}
 };
 
 use nom::{
   IResult,
   branch::{alt},
-  multi::{many0, fold_many0},
+  multi::{many0},
   bytes::complete::{
     tag,
     take_while_m_n,
     take_while1,
   },
-  character::complete::{
-    char, multispace1, multispace0, space0
-  },
-  sequence::{pair, preceded, delimited},
+  character::complete::{char, multispace1, multispace0},
+  sequence::{pair, preceded},
   combinator::{map, map_res, opt, value}
 };
 
@@ -26,10 +24,10 @@ pub(crate) fn parse_int(input: &str) -> Result<i32, std::num::ParseIntError> {
 }
 
 pub(crate) fn yee(input: &str) -> NomResult<Statements> {
-  let (input, _) = tag("yee ")(input)?;
-  let (input, sign) = opt(tag("-"))(input)?;
-  let (input, num) = map_res(take_while_m_n(1, 10, |c: char| c.is_digit(10)), parse_int)(input)?;
-  let num = if let Some(_) = sign { -num } else { num };
+  let (input, _): (&str, &str) = tag("yee ")(input)?;
+  let (input, sign): (&str, Option<&str>) = opt(tag("-"))(input)?;
+  let (input, num): (&str, i32) = map_res(take_while_m_n(1, 10, |c: char| c.is_digit(10)), parse_int)(input)?;
+  let num: i32 = if let Some(_) = sign { -num } else { num };
   Ok((input, Statements::Yee { code: num }))
 }
 
@@ -52,7 +50,7 @@ pub(crate) fn split_comma(input: &str) -> WoojinResult<Vec<&str>> {
       match c {
         '"' => in_quotes = !in_quotes,
         ',' if !in_quotes => {
-          let value = &input[start..i].trim();
+          let value: &&str = &input[start..i].trim();
           result.push(value.to_owned()); // push owned value
           start = i + 1;
         }
@@ -189,57 +187,6 @@ pub(crate) fn parse_variable_name(input: &str) -> IResult<&str, String> {
   Ok((input, a.to_string()))
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub(crate) enum Calc {
-  Value(WoojinValue),
-  Add(Box<Calc>, Box<Calc>),
-  Sub(Box<Calc>, Box<Calc>),
-  Mul(Box<Calc>, Box<Calc>),
-  Div(Box<Calc>, Box<Calc>),
-}
-
-pub(crate) fn parse_primary(input: &str) -> IResult<&str, Calc> {
-  alt((
-    map(parse_value, Calc::Value),
-    delimited(
-      char('('),
-      delimited(space0, parse_expr, space0),
-      char(')'),
-    ),
-  ))(input)
-}
-
-pub(crate) fn parse_term(input: &str) -> IResult<&str, Calc> {
-  let (input, init): (&str, Calc) = parse_primary(input)?;
-  fold_many0(
-    pair(alt((tag("*"), tag("/"))), parse_primary),
-    move || init.clone(),
-    |acc, (op, val)| match op {
-        "*" => Calc::Mul(Box::new(acc), Box::new(val)),
-        "/" => Calc::Div(Box::new(acc), Box::new(val)),
-        _ => unreachable!(),
-    },
-  )(input)
-}
-
-pub(crate) fn parse_expr(input: &str) -> IResult<&str, Calc> {
-  let (input, init): (&str, Calc) = parse_term(input)?;
-  fold_many0(
-    pair(alt((tag("+"), tag("-"))), parse_term),
-    move || init.clone(),
-    |acc, (op, val)| match op {
-      "+" => Calc::Add(Box::new(acc), Box::new(val)),
-      "-" => Calc::Sub(Box::new(acc), Box::new(val)),
-      _ => unreachable!(),
-    },
-  )(input)
-}
-
-
-pub(crate) fn parse_calc(input: &str) -> IResult<&str, Calc> {
-  delimited(space0, parse_expr, space0)(input)
-}
-
 pub(crate) fn tokenizer(line: &impl ToString) -> Result<Statements, crate::error::WoojinError> {
   let line: String = line.to_string().trim().to_string();
   match line {
@@ -252,8 +199,8 @@ pub(crate) fn tokenizer(line: &impl ToString) -> Result<Statements, crate::error
     line if line.starts_with("input") => Ok(input(&line)?),
     line if line.starts_with("sleep") => Ok(sleep(&line)?),
     line if line.starts_with("let") => {
-      let (_, (var_name, input, mutable)) = parse_variable(&line)?;
-      let stmts = tokenizer(&input.to_string())?;
+      let (_, (var_name, input, mutable)): (&str, (String, &str, bool)) = parse_variable(&line)?;
+      let stmts: Statements = tokenizer(&input.to_string())?;
       Ok(Statements::Let {
         name: var_name,
         stmt: Box::new(stmts),

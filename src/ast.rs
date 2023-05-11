@@ -1,4 +1,4 @@
-use crate::{types::WoojinValue, variable::VariableOption, parser::Calc};
+use crate::{types::WoojinValue, variable::VariableOption, calc::Calc};
 
 #[derive(Debug, Clone)]
 pub(crate) enum Statements {

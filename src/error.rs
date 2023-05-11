@@ -12,7 +12,12 @@ pub enum WoojinErrorKind {
   UndeclaredVariable,
   VariableAlreadyDeclared,
   VariableNotMutable,
-  ParseError
+  ParseError,
+  CannotAdd,
+  CannotSubtract,
+  CannotMultiply,
+  CannotDivide,
+  DivisionByZero,
 }
 
 #[derive(Debug)]
