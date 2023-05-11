@@ -1,10 +1,1 @@
-let question = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
-println $question;
-println $question;
-println $question;
-input $question;
-let mut name = input $question;
-println "name", $name;
-$name = 1;
-println "name", $name;
 yee 0;
