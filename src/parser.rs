@@ -36,7 +36,7 @@ pub(crate) fn yee(input: &str) -> NomResult<Statements> {
 pub(crate) fn vec2stmt(values: &Vec<&str>) -> WoojinResult<Vec<Box<Statements>>> {
   let mut result: Vec<Box<Statements>> = vec![];
   for value in values {
-    let val = tokenizer(value)?;
+    let val: Statements = tokenizer(value)?;
     result.push(Box::new(val));
   };
   Ok(result)
@@ -44,10 +44,10 @@ pub(crate) fn vec2stmt(values: &Vec<&str>) -> WoojinResult<Vec<Box<Statements>>>
 
 pub(crate) fn split_comma(input: &str) -> WoojinResult<Vec<&str>> {
   let values: Vec<&str> = if input.trim().contains(",") {
-    let mut in_quotes = false;
-    let mut start = 0;
-    let mut result = vec![];
-    let chars = input.trim().chars().enumerate();
+    let mut in_quotes: bool = false;
+    let mut start: usize = 0;
+    let mut result: Vec<&str> = vec![];
+    let chars: std::iter::Enumerate<std::str::Chars> = input.trim().chars().enumerate();
     for (i, c) in chars {
       match c {
         '"' => in_quotes = !in_quotes,
@@ -59,8 +59,7 @@ pub(crate) fn split_comma(input: &str) -> WoojinResult<Vec<&str>> {
         _ => {}
       }
     }
-    // 마지막 값 추가
-    let value = &input[start..].trim();
+    let value: &&str = &input[start..].trim();
     result.push(value.to_owned()); // push owned value
     result
   } else {
@@ -70,7 +69,7 @@ pub(crate) fn split_comma(input: &str) -> WoojinResult<Vec<&str>> {
 }
 
 pub(crate) fn print(input: &str) -> WoojinResult<Statements> {
-  let input = match tag::<&str, _, nom::error::Error<&str>>("print ")(input) {
+  let input: &str = match tag::<&str, _, nom::error::Error<&str>>("print ")(input) {
     Ok((input, _)) => input.trim(),
     Err(_) => return Err(WoojinError::new("Invalid usage of print", crate::error::WoojinErrorKind::Unknown))
   };
@@ -79,7 +78,7 @@ pub(crate) fn print(input: &str) -> WoojinResult<Statements> {
 }
 
 pub(crate) fn println(input: &str) -> WoojinResult<Statements> {
-  let input = match tag::<&str, _, nom::error::Error<&str>>("println ")(input) {
+  let input: &str = match tag::<&str, _, nom::error::Error<&str>>("println ")(input) {
     Ok((input, _)) => input.trim(),
     Err(_) => return Err(WoojinError::new("Invalid usage of println", crate::error::WoojinErrorKind::Unknown))
   };
@@ -88,7 +87,7 @@ pub(crate) fn println(input: &str) -> WoojinResult<Statements> {
 }
 
 pub(crate) fn roar(input: &str) -> WoojinResult<Statements> {
-  let input = match tag::<&str, _, nom::error::Error<&str>>("roar ")(input) {
+  let input: &str = match tag::<&str, _, nom::error::Error<&str>>("roar ")(input) {
     Ok((input, _)) => input,
     Err(_) => return Err(WoojinError::new("Invalid usage of roar", crate::error::WoojinErrorKind::Unknown))
   };
@@ -96,7 +95,7 @@ pub(crate) fn roar(input: &str) -> WoojinResult<Statements> {
 }
 
 pub(crate) fn input(i: &str) -> WoojinResult<Statements> {
-  let input = match tag::<&str, _, nom::error::Error<&str>>("input ")(i) {
+  let input: &str = match tag::<&str, _, nom::error::Error<&str>>("input ")(i) {
     Ok((input, _)) => input,
     Err(_) => return Err(WoojinError::new("Invalid usage of input", crate::error::WoojinErrorKind::Unknown))
   };
@@ -104,7 +103,7 @@ pub(crate) fn input(i: &str) -> WoojinResult<Statements> {
 }
 
 pub(crate) fn sleep(i: &str) -> WoojinResult<Statements> {
-  let input = match tag::<&str, _, nom::error::Error<&str>>("sleep ")(i) {
+  let input: &str = match tag::<&str, _, nom::error::Error<&str>>("sleep ")(i) {
     Ok((input, _)) => input,
     Err(_) => return Err(WoojinError::new("Invalid usage of sleep", crate::error::WoojinErrorKind::Unknown))
   };
@@ -112,19 +111,19 @@ pub(crate) fn sleep(i: &str) -> WoojinResult<Statements> {
 }
 
 pub(crate) fn parse_variable(input: &str) -> IResult<&str, (String, &str, bool)> {
-  let (input, _) = multispace0(input)?;
-  let (input, mutable) = alt((
+  let (input, _): (&str, &str) = multispace0(input)?;
+  let (input, mutable): (&str, bool) = alt((
     value(true, preceded(tag("let"), preceded(multispace1, tag("mut")))),
     value(false, preceded(tag("let"), multispace1)),
   ))(input)?;
-  let (input, _) = multispace0(input)?;
-  let (input, var_name) = map(
+  let (input, _): (&str, &str) = multispace0(input)?;
+  let (input, var_name): (&str, String) = map(
     pair(
       take_while1(|c: char| c.is_ascii_alphanumeric() || c == '_'),
       many0(preceded(multispace1, take_while1(|c: char| c.is_ascii_alphanumeric() || c == '_'))),
     ),
     |(first, rest)| {
-      let mut name = String::from(first);
+      let mut name: String = String::from(first);
       for s in rest {
         name.push(' ');
         name.push_str(s);
@@ -132,21 +131,21 @@ pub(crate) fn parse_variable(input: &str) -> IResult<&str, (String, &str, bool)>
       name
     },
   )(input)?;
-  let (input, _) = multispace0(input)?;
-  let (input, _) = char('=')(input)?;
-  let (input, _) = multispace0(input)?;
+  let (input, _): (&str, &str) = multispace0(input)?;
+  let (input, _): (&str, char) = char('=')(input)?;
+  let (input, _): (&str, &str) = multispace0(input)?;
   Ok((input, (var_name.to_string(), input, mutable)))
 }
 
 pub(crate) fn parse_assignment(input: &str) -> IResult<&str, (String, &str, String)> {
-  let (input, _) = multispace0(input)?;
-  let (input, var_name) = map(
+  let (input, _): (&str, &str) = multispace0(input)?;
+  let (input, var_name): (&str, String) = map(
     pair(
       preceded(char('$'), take_while1(|c: char| c.is_ascii_alphanumeric() || c == '_')),
       many0(preceded(multispace1, take_while1(|c: char| c.is_ascii_alphanumeric() || c == '_'))),
     ),
     |(first, rest)| {
-      let mut name = String::from(first);
+      let mut name: String = String::from(first);
       for s in rest {
         name.push(' ');
         name.push_str(s);
@@ -154,16 +153,16 @@ pub(crate) fn parse_assignment(input: &str) -> IResult<&str, (String, &str, Stri
       name
     },
   )(input)?;
-  let (input, _) = multispace0(input)?;
-  let (input, _) = char('=')(input)?;
-  let (input, _) = multispace0(input)?;
-  let (input, value) = map(
+  let (input, _): (&str, &str) = multispace0(input)?;
+  let (input, _): (&str, char) = char('=')(input)?;
+  let (input, _): (&str, &str) = multispace0(input)?;
+  let (input, value): (&str, String) = map(
     pair(
       take_while1(|c: char| c.is_ascii_alphanumeric() || c == '_'),
       many0(preceded(multispace1, take_while1(|c: char| c.is_ascii_alphanumeric() || c == '_'))),
     ),
     |(first, rest)| {
-      let mut val = String::from(first);
+      let mut val: String = String::from(first);
       for s in rest {
         val.push(' ');
         val.push_str(s);
@@ -171,7 +170,7 @@ pub(crate) fn parse_assignment(input: &str) -> IResult<&str, (String, &str, Stri
       val
     },
   )(input)?;
-  let (input, _) = multispace0(input)?;
+  let (input, _): (&str, &str) = multispace0(input)?;
   Ok((input, (var_name.to_string(), input, value.to_string())))
 }
 
@@ -186,7 +185,7 @@ pub(crate) fn test(input: &str) -> WoojinResult<WoojinValue> {
 }
 
 pub(crate) fn parse_variable_name(input: &str) -> IResult<&str, String> {
-  let (input, a) = preceded(char('$'), take_while1(|c: char| c.is_ascii_alphanumeric() || c == '_'))(input)?;
+  let (input, a): (&str, &str) = preceded(char('$'), take_while1(|c: char| c.is_ascii_alphanumeric() || c == '_'))(input)?;
   Ok((input, a.to_string()))
 }
 
@@ -211,7 +210,7 @@ pub(crate) fn parse_primary(input: &str) -> IResult<&str, Calc> {
 }
 
 pub(crate) fn parse_term(input: &str) -> IResult<&str, Calc> {
-  let (input, init) = parse_primary(input)?;
+  let (input, init): (&str, Calc) = parse_primary(input)?;
   fold_many0(
     pair(alt((tag("*"), tag("/"))), parse_primary),
     move || init.clone(),
@@ -224,7 +223,7 @@ pub(crate) fn parse_term(input: &str) -> IResult<&str, Calc> {
 }
 
 pub(crate) fn parse_expr(input: &str) -> IResult<&str, Calc> {
-  let (input, init) = parse_term(input)?;
+  let (input, init): (&str, Calc) = parse_term(input)?;
   fold_many0(
     pair(alt((tag("+"), tag("-"))), parse_term),
     move || init.clone(),
@@ -242,7 +241,7 @@ pub(crate) fn parse_calc(input: &str) -> IResult<&str, Calc> {
 }
 
 pub(crate) fn tokenizer(line: &impl ToString) -> Result<Statements, crate::error::WoojinError> {
-  let line = line.to_string().trim().to_string();
+  let line: String = line.to_string().trim().to_string();
   match line {
     line if line == "" => Ok(Statements::Value { value: WoojinValue::String("".to_string()) }),
     line if line.starts_with("//") => Ok(Statements::Comment(line[2..].trim().to_string())),

@@ -29,7 +29,7 @@ lazy_static! {
 }
 
 pub(crate) fn get_var(name: &str) -> WoojinVariable {
-  let vars = VARS.lock().unwrap();
+  let vars: std::sync::MutexGuard<HashMap<String, WoojinVariable>> = VARS.lock().unwrap();
   if !vars.contains_key(name) {
     WoojinError::new(format!("Variable {} is not declared", name), WoojinErrorKind::UndeclaredVariable).exit();
   }
@@ -37,15 +37,15 @@ pub(crate) fn get_var(name: &str) -> WoojinVariable {
 }
 
 pub(crate) fn change_var(name: &str, stmt: &Statements) -> Result<(), WoojinError> {
-  let var = get_var(name);
+  let var: WoojinVariable = get_var(name);
   if !var.is_mut { WoojinError::new(format!("Variable {} is not mutable", name), WoojinErrorKind::VariableNotMutable).exit(); }
-  let mut vars = VARS.lock().unwrap();
+  let mut vars: std::sync::MutexGuard<HashMap<String, WoojinVariable>> = VARS.lock().unwrap();
   vars.insert(name.to_string(), WoojinVariable { value: exec(stmt)?.clone(), is_mut: var.is_mut });
   Ok(())
 }
 
 pub(crate) fn dec_var(name: &str, value: &WoojinValue, option: &VariableOption) -> Result<(), WoojinError> {
-  let mut vars = VARS.lock().unwrap();
+  let mut vars: std::sync::MutexGuard<HashMap<String, WoojinVariable>> = VARS.lock().unwrap();
   if vars.contains_key(name) {
     WoojinError::new(format!("Variable {} is already declared", name), WoojinErrorKind::VariableAlreadyDeclared).exit();
   }
