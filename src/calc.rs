@@ -105,7 +105,7 @@ impl ValueCalc for WoojinValue {
 
   fn div(&self, other: &WoojinValue) -> WoojinResult<WoojinValue> {
     #[allow(non_snake_case)]
-    let DivisionZeroError = WoojinError::new("It cannot be divided by 0.0", crate::error::WoojinErrorKind::DivisionByZero);
+    let DivisionZeroError: WoojinError = WoojinError::new("It cannot be divided by 0.0", crate::error::WoojinErrorKind::DivisionByZero);
     match (self, other.value()) {
       (WoojinValue::Int(a), WoojinValue::Int(b)) => Ok(if b != 0 { WoojinValue::Int(a / b) } else { return Err(DivisionZeroError) }),
       (WoojinValue::Float(a), WoojinValue::Float(b)) => Ok(if b != 0.0 { WoojinValue::Float(a / b) } else {return Err(DivisionZeroError)}),
