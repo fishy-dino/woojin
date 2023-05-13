@@ -72,9 +72,13 @@ pub(crate) fn exec(stmt: &Statements) -> Result<WoojinValue, crate::error::Wooji
         _ => WoojinError::new("The param of the sleep function must be an integer", error::WoojinErrorKind::Unknown).exit()
       }
     },
-    Statements::Assignment { name, value } => { variable::change_var(name.as_str(), &value)?; },
-    Statements::Let { name, stmt, option } => { 
+    Statements::Assignment { name, value } => {
+      let value: WoojinValue = exec(value)?;
+      variable::change_var(name.as_str(), &value)?;
+    },
+    Statements::Let { name, stmt, kind, option } => { 
       let value: WoojinValue = exec(stmt)?;
+      if value.kind() != *kind { return Err(WoojinError::new("The type of the value and the type of the variable are different", error::WoojinErrorKind::Unknown)); }
       variable::dec_var(name.as_str(), &value, option)?;
     },
     // Statements::If { condition: _, body: _ } => {}, 

@@ -1,3 +1,4 @@
-println 2 + 4, 4*20
-println "F" * 3;
+let mut a: int = 3;
+println $a;
+$a = 3.3;
 yee 0;

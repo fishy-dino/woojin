@@ -15,13 +15,10 @@ This is Woojinlang interpreter written in Rust(Current v0.1.x).<br/>
 The Woojinlang project is a project that was started as a joke to tease my friend. Do not use this language in your projects.<br/>
 The **0.x.x** version is an unofficial version. Current grammar may not be compatible with the official version (>=1.x.x)<br/>
 
-Click here to read the [manual](https://teamfishydino.github.io/fishydocs/).
+woojin is currently available in unofficial(beta) versions only, and there is no official release version. Therefore, it may not function perfectly and could have numerous bugs. We frequently receive reports of errors or bugs occurring in wooJin. We promptly address these reports and strive to minimize the errors present in wooJin. For example, the deadlock issue that occurred in v0.1.1 was resolved in the subsequent version, v0.1.2. Hence, we recommend using the latest version of woojin as it has fewer errors, a higher likelihood of proper functioning, and offers a wide range of features.
 
-[node-woojin](https://github.com/minjeadev/node-woojin), the only existing woojinlang interpreter, is no longer being developed. Also, there are so many problems with code in node-woojin that we recommend that you no longer use it. **Use this safer, more improved program instead of node-woojin**.
+If you have discovered any issues (**bugs, etc.**) with woojin, please feel free to reach out to us through our **[GitHub issue page](https://github.com/teamfishydino/woojin/issues)** or via email at **teamfishydino@gmail.com**. Additionally, if you have any questions about woojin or if you have ideas for additional features or improvements, we encourage you to utilize our **[GitHub discussion page](https://github.com/teamfishydino/woojin/discussions)**. You can also find announcements and updates regarding woojin on our GitHub(**[Here!](https://github.com/teamfishydino/woojin/discussions/categories/announcements)**).
 
-Our developers like Rust, but we are not good at it. In other words, there may be serious bugs in this code or unnecessary code. We are ready to accept any advice from you. If you have any comments on Woojinlang's grammar, or your opinions of Woojin, or the our code etc, please feel free to contact us(teamfishydino@gmail.com)
-
-Thank you so much for using our program.
 ## How To Install
 * **Install Rust first** (if you have already installed the latest version of Rust on your computer, you may skip this process)<br/>https://www.rust-lang.org/tools/install
 * **Download woojin with cargo**

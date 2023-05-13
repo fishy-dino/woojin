@@ -18,6 +18,8 @@ pub enum WoojinErrorKind {
   CannotMultiply,
   CannotDivide,
   DivisionByZero,
+  InvalidType,
+  TypeMismatch
 }
 
 #[derive(Debug)]

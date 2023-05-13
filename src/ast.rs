@@ -1,4 +1,4 @@
-use crate::{types::WoojinValue, variable::VariableOption, calc::Calc};
+use crate::{types::{WoojinValue, WoojinValueKind}, variable::VariableOption, calc::Calc};
 
 #[derive(Debug, Clone)]
 pub(crate) enum Statements {
@@ -10,6 +10,7 @@ pub(crate) enum Statements {
   Input { question: Box<Statements> },
   Let {
     name: String,
+    kind: WoojinValueKind,
     stmt: Box<Statements>,
     option: VariableOption,
   },

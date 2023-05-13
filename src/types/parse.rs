@@ -5,19 +5,35 @@ use nom::{
   },
   character::complete::{char, digit1},
   combinator::{map, map_res, opt, recognize},
-  sequence::{delimited, pair},
+  sequence::{delimited, pair, tuple},
   IResult,
 };
 
-use crate::{parser::{parse_variable_name}};
+use crate::{
+  parser::{parse_variable_name}
+};
 
 use super::WoojinValue;
 
 // Integer(signed)
 pub(crate) fn parse_int(input: &str) -> IResult<&str, i32> {
   map_res(
-    recognize(pair(opt(alt((char('+'), char('-')))), digit1)),
-    |s: &str| s.parse::<i32>(),
+      recognize(pair(
+          opt(alt((char('+'), char('-')))),
+          digit1,
+      )),
+      |s: &str| s.parse::<i32>(),
+  )(input)
+}
+
+pub(crate) fn parse_float(input: &str) -> IResult<&str, f32> {
+  map_res(
+      recognize(tuple((
+          opt(alt((char('+'), char('-')))),
+          pair(digit1, char('.')),
+          digit1,
+      ))),
+      |s: &str| s.parse::<f32>(),
   )(input)
 }
 
@@ -55,6 +71,7 @@ pub(crate) fn parse_bool(input: &str) -> IResult<&str, bool> {
 pub(crate) fn parse_value(input: &str) -> IResult<&str, WoojinValue> {
   alt((
     map(parse_string, WoojinValue::String),
+    map(parse_float, WoojinValue::Float),
     map(parse_int, WoojinValue::Int),
     map(parse_bool, WoojinValue::Bool),
     map(parse_variable_name, WoojinValue::Var),

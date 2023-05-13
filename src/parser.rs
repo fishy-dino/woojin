@@ -1,19 +1,20 @@
+use std::str::FromStr;
+
 use crate::{
   ast::Statements,
-  NomResult, types::{WoojinValue, parse::parse_value}, error::WoojinError, variable::VariableOption, exec, calc::{parse_calc, Calc}
+  NomResult, types::{WoojinValue, parse::parse_value, WoojinValueKind}, error::WoojinError, variable::VariableOption, exec, calc::{parse_calc, Calc}
 };
 
 use nom::{
   IResult,
   branch::{alt},
-  multi::{many0},
   bytes::complete::{
     tag,
     take_while_m_n,
     take_while1,
   },
   character::complete::{char, multispace1, multispace0},
-  sequence::{pair, preceded},
+  sequence::{preceded},
   combinator::{map, map_res, opt, value}
 };
 
@@ -108,68 +109,37 @@ pub(crate) fn sleep(i: &str) -> WoojinResult<Statements> {
   Ok(Statements::Sleep { value: Box::new(tokenizer(&input.to_string())?) })
 }
 
-pub(crate) fn parse_variable(input: &str) -> IResult<&str, (String, &str, bool)> {
+pub(crate) fn parse_variable(input: &str) -> IResult<&str, (String, String, &str, bool)> {
   let (input, _): (&str, &str) = multispace0(input)?;
   let (input, mutable): (&str, bool) = alt((
-    value(true, preceded(tag("let"), preceded(multispace1, tag("mut")))),
-    value(false, preceded(tag("let"), multispace1)),
+      value(true, preceded(tag("let"), preceded(multispace1, tag("mut")))),
+      value(false, preceded(tag("let"), multispace1)),
   ))(input)?;
   let (input, _): (&str, &str) = multispace0(input)?;
   let (input, var_name): (&str, String) = map(
-    pair(
       take_while1(|c: char| c.is_ascii_alphanumeric() || c == '_'),
-      many0(preceded(multispace1, take_while1(|c: char| c.is_ascii_alphanumeric() || c == '_'))),
-    ),
-    |(first, rest)| {
-      let mut name: String = String::from(first);
-      for s in rest {
-        name.push(' ');
-        name.push_str(s);
-      }
-      name
-    },
+      |s: &str| s.to_string(),
+  )(input)?;
+  let (input, _): (&str, &str) = multispace0(input)?;
+  let (input, _): (&str, &str) = tag(":")(input)?;
+  let (input, _): (&str, &str) = multispace0(input)?;
+  let (input, var_type): (&str, String) = map(
+      take_while1(|c: char| c.is_ascii_alphanumeric() || c == '_'),
+      |s: &str| s.to_string(),
   )(input)?;
   let (input, _): (&str, &str) = multispace0(input)?;
   let (input, _): (&str, char) = char('=')(input)?;
   let (input, _): (&str, &str) = multispace0(input)?;
-  Ok((input, (var_name.to_string(), input, mutable)))
+  let (input, value): (&str, &str) = take_while1(|c: char| c != ';' && c != '\n')(input)?;
+  Ok((input, (var_name, var_type, value, mutable)))
 }
 
-pub(crate) fn parse_assignment(input: &str) -> IResult<&str, (String, &str, String)> {
-  let (input, _): (&str, &str) = multispace0(input)?;
-  let (input, var_name): (&str, String) = map(
-    pair(
-      preceded(char('$'), take_while1(|c: char| c.is_ascii_alphanumeric() || c == '_')),
-      many0(preceded(multispace1, take_while1(|c: char| c.is_ascii_alphanumeric() || c == '_'))),
-    ),
-    |(first, rest)| {
-      let mut name: String = String::from(first);
-      for s in rest {
-        name.push(' ');
-        name.push_str(s);
-      }
-      name
-    },
-  )(input)?;
-  let (input, _): (&str, &str) = multispace0(input)?;
-  let (input, _): (&str, char) = char('=')(input)?;
-  let (input, _): (&str, &str) = multispace0(input)?;
-  let (input, value): (&str, String) = map(
-    pair(
-      take_while1(|c: char| c.is_ascii_alphanumeric() || c == '_'),
-      many0(preceded(multispace1, take_while1(|c: char| c.is_ascii_alphanumeric() || c == '_'))),
-    ),
-    |(first, rest)| {
-      let mut val: String = String::from(first);
-      for s in rest {
-        val.push(' ');
-        val.push_str(s);
-      }
-      val
-    },
-  )(input)?;
-  let (input, _): (&str, &str) = multispace0(input)?;
-  Ok((input, (var_name.to_string(), input, value.to_string())))
+pub(crate) fn parse_assignment(input: &str) -> WoojinResult<(String, String)>{
+  let splited: Vec<String> = input.split("=").map(|a| a.to_string()).collect();
+  if splited.len() < 2 { return Err(WoojinError::new("Invalid assignment", crate::error::WoojinErrorKind::Unknown)); }
+  let (_, varname) = parse_variable_name(splited[0].trim())?;
+  let value: String = splited[1].trim().to_string();
+  Ok((varname, value))
 }
 
 pub(crate) fn test(input: &str) -> WoojinResult<WoojinValue> {
@@ -199,18 +169,19 @@ pub(crate) fn tokenizer(line: &impl ToString) -> Result<Statements, crate::error
     line if line.starts_with("input") => Ok(input(&line)?),
     line if line.starts_with("sleep") => Ok(sleep(&line)?),
     line if line.starts_with("let") => {
-      let (_, (var_name, input, mutable)): (&str, (String, &str, bool)) = parse_variable(&line)?;
+      let (_, (var_name, kind, input, mutable)): (&str, (String, String, &str, bool)) = parse_variable(&line)?;
       let stmts: Statements = tokenizer(&input.to_string())?;
       Ok(Statements::Let {
         name: var_name,
         stmt: Box::new(stmts),
+        kind: if kind.is_empty() { WoojinValueKind::Any } else { WoojinValueKind::from_str(&kind)? },
         option: VariableOption::new(Some(mutable), None)
       })
     },
     line if line.starts_with("$") && line.contains("=") => {
-      let (_, (var_name, _, value)) = parse_assignment(&line)?;
-      let stmts = tokenizer(&value.to_string())?;
-      Ok(Statements::Assignment { name: var_name, value: Box::new(stmts) })
+      let (varname, value)= parse_assignment(&line)?;
+      let stmts = tokenizer(&value)?;
+      Ok(Statements::Assignment { name: varname, value: Box::new(stmts) })
     },
     _ => match parse_calc(line.as_str()) {
       Ok(val) => {
