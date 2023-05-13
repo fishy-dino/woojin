@@ -78,7 +78,7 @@ pub(crate) fn exec(stmt: &Statements) -> Result<WoojinValue, crate::error::Wooji
     },
     Statements::Let { name, stmt, kind, option } => { 
       let value: WoojinValue = exec(stmt)?;
-      if value.kind() != *kind { return Err(WoojinError::new("The type of the value and the type of the variable are different", error::WoojinErrorKind::Unknown)); }
+      if !value.type_eq(*kind) { return Err(WoojinError::new("The type of the value and the type of the variable are different", error::WoojinErrorKind::Unknown)); }
       variable::dec_var(name.as_str(), &value, option)?;
     },
     // Statements::If { condition: _, body: _ } => {}, 

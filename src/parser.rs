@@ -121,12 +121,13 @@ pub(crate) fn parse_variable(input: &str) -> IResult<&str, (String, String, &str
       |s: &str| s.to_string(),
   )(input)?;
   let (input, _): (&str, &str) = multispace0(input)?;
-  let (input, _): (&str, &str) = tag(":")(input)?;
+  let (input, _): (&str, Option<&str>) = opt(tag(":"))(input)?;
   let (input, _): (&str, &str) = multispace0(input)?;
-  let (input, var_type): (&str, String) = map(
-      take_while1(|c: char| c.is_ascii_alphanumeric() || c == '_'),
-      |s: &str| s.to_string(),
+  let (input, var_type): (&str, Option<String>) = map(
+      opt(take_while1(|c: char| c.is_ascii_alphanumeric() || c == '_')),
+      |s: Option<&str>| s.map(|s| s.to_string()),
   )(input)?;
+  let var_type: String = if let Some(s) = var_type { s } else { "".to_string()};
   let (input, _): (&str, &str) = multispace0(input)?;
   let (input, _): (&str, char) = char('=')(input)?;
   let (input, _): (&str, &str) = multispace0(input)?;
@@ -179,8 +180,8 @@ pub(crate) fn tokenizer(line: &impl ToString) -> Result<Statements, crate::error
       })
     },
     line if line.starts_with("$") && line.contains("=") => {
-      let (varname, value)= parse_assignment(&line)?;
-      let stmts = tokenizer(&value)?;
+      let (varname, value): (String, String) = parse_assignment(&line)?;
+      let stmts: Statements = tokenizer(&value)?;
       Ok(Statements::Assignment { name: varname, value: Box::new(stmts) })
     },
     _ => match parse_calc(line.as_str()) {
