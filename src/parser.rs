@@ -11,10 +11,10 @@ use nom::{
   bytes::complete::{
     tag,
     take_while_m_n,
-    take_while1,
+    take_while1, take_while,
   },
   character::complete::{char, multispace1, multispace0},
-  sequence::{preceded},
+  sequence::{preceded, terminated},
   combinator::{map, map_res, opt, value}
 };
 
@@ -35,7 +35,7 @@ pub(crate) fn yee(input: &str) -> NomResult<Statements> {
 pub(crate) fn vec2stmt(values: &Vec<&str>) -> WoojinResult<Vec<Box<Statements>>> {
   let mut result: Vec<Box<Statements>> = vec![];
   for value in values {
-    let val: Statements = tokenizer(value)?;
+    let val: Statements = tokenize_line(value)?;
     result.push(Box::new(val));
   };
   Ok(result)
@@ -98,7 +98,7 @@ pub(crate) fn input(i: &str) -> WoojinResult<Statements> {
     Ok((input, _)) => input,
     Err(_) => return Err(WoojinError::new("Invalid usage of input", crate::error::WoojinErrorKind::Unknown))
   };
-  Ok(Statements::Input { question: Box::new(tokenizer(&input.to_string())?) })
+  Ok(Statements::Input { question: Box::new(tokenize_line(&input.to_string())?) })
 }
 
 pub(crate) fn sleep(i: &str) -> WoojinResult<Statements> {
@@ -106,7 +106,7 @@ pub(crate) fn sleep(i: &str) -> WoojinResult<Statements> {
     Ok((input, _)) => input,
     Err(_) => return Err(WoojinError::new("Invalid usage of sleep", crate::error::WoojinErrorKind::Unknown))
   };
-  Ok(Statements::Sleep { value: Box::new(tokenizer(&input.to_string())?) })
+  Ok(Statements::Sleep { value: Box::new(tokenize_line(&input.to_string())?) })
 }
 
 pub(crate) fn parse_variable(input: &str) -> IResult<&str, (String, String, &str, bool)> {
@@ -137,14 +137,33 @@ pub(crate) fn parse_variable(input: &str) -> IResult<&str, (String, String, &str
 
 pub(crate) fn parse_assignment(input: &str) -> WoojinResult<(String, String)>{
   let splited: Vec<String> = input.split("=").map(|a| a.to_string()).collect();
-  if splited.len() < 2 { return Err(WoojinError::new("Invalid assignment", crate::error::WoojinErrorKind::Unknown)); }
+  if splited.len() < 2 { return Err(WoojinError::new("Invalid assignment", crate::error::WoojinErrorKind::InvaildAssignment)); }
   let (_, varname) = parse_variable_name(splited[0].trim())?;
   let value: String = splited[1].trim().to_string();
   Ok((varname, value))
 }
 
+fn parse_whitespace(input: &str) -> IResult<&str, &str> {
+  take_while(|c: char| c.is_whitespace())(input)
+}
+
+fn parse_if_condition(input: &str) -> IResult<&str, &str> {
+  preceded(tag("if "), terminated(take_while(|c: char| c != ':'), tag(":")))(input)
+}
+
+fn check_is_else(input: &str) -> IResult<&str, &str> {
+  preceded(tag("else"), terminated(parse_whitespace, tag(":")))(input)
+}
+
+fn is_else(input: &str) -> bool {
+  match check_is_else(input) {
+    Ok(_) => true,
+    Err(_) => false
+  }
+}
+
 pub(crate) fn test(input: &str) -> WoojinResult<WoojinValue> {
-  match tokenizer(&input.to_string())? {
+  match tokenize_line(&input.to_string())? {
     Statements::Value { value: val } => Ok(val),
     a => match exec(&a) {
       Ok(val) => Ok(val),
@@ -158,10 +177,88 @@ pub(crate) fn parse_variable_name(input: &str) -> IResult<&str, String> {
   Ok((input, a.to_string()))
 }
 
-pub(crate) fn tokenizer(line: &impl ToString) -> Result<Statements, crate::error::WoojinError> {
+pub(crate) fn tokenizer(lines: &Vec<(usize, String)>) -> WoojinResult<Vec<Statements>> {
+  let mut pointer: usize = 0;
+  let mut result: Vec<Statements> = vec![];
+  while pointer < lines.len() {
+    let (indent, line): &(usize, String) = &lines[pointer];
+    let mut tokenized: Statements = tokenize_line(line)?.clone();
+    match &mut tokenized {
+      Statements::If { condition: _, stmt, else_stmt} => {
+        let (if_stmt, e_stmt): (Vec<Box<Statements>>, Vec<Box<Statements>>) = parse_if(lines, &mut pointer, *indent)?;
+        *stmt = if_stmt;
+        *else_stmt = e_stmt;
+        result.push(tokenized)
+      }
+      _ => result.push(tokenized),
+    }
+    pointer += 1;
+  }
+  Ok(result)
+}
+
+pub(crate) fn parse_if(lines: &Vec<(usize, String)>, pointer: &mut usize, indent: usize) -> WoojinResult<(Vec<Box<Statements>>, Vec<Box<Statements>>)> {
+  let mut result: (Vec<Box<Statements>>, Vec<Box<Statements>>) = (vec![], vec![]);
+  *pointer += 1;
+  while *pointer < lines.len() {
+    let (line_indent, line): &&(usize, String) = &lines.get(*pointer).ok_or(WoojinError::new("Invalid indent", crate::error::WoojinErrorKind::InvalidIndent))?;
+    if *line_indent <= indent {
+      if !is_else(line) {
+        *pointer -= 1;
+        return Ok(result);
+      }
+      result.1 = parse_else(lines, &mut *pointer, *line_indent)?;
+      return Ok(result);
+    }
+    let mut tokenized: Statements = tokenize_line(line)?;
+    match &mut tokenized {
+      Statements::If { condition: _, stmt, else_stmt } => {
+        let (if_stmt, e_stmt): (Vec<Box<Statements>>, Vec<Box<Statements>>) = parse_if(lines, &mut *pointer, *line_indent)?;
+        *stmt = if_stmt;
+        *else_stmt = e_stmt;
+        result.0.push(Box::new(tokenized));
+      }
+      _ => result.0.push(Box::new(tokenized))
+    }
+    *pointer += 1;
+  }
+  Err(WoojinError::new("Parsing If statement failed", crate::error::WoojinErrorKind::IfParsingFailed))
+}
+
+pub(crate) fn parse_else(lines: &Vec<(usize, String)>, pointer: &mut usize, indent: usize) -> WoojinResult<Vec<Box<Statements>>> {
+  let mut result: Vec<Box<Statements>> = vec![];
+  *pointer += 1;
+  while *pointer < lines.len() {
+    let (line_indent, line): &&(usize, String) = &lines.get(*pointer).ok_or(WoojinError::new("Invalid indent", crate::error::WoojinErrorKind::InvalidIndent))?;
+    if *line_indent <= indent {
+      *pointer = *pointer-1;
+      return Ok(result);
+    }
+    let mut tokenized: Statements = tokenize_line(line)?;
+    match &mut tokenized {
+      Statements::If { condition: _, stmt, else_stmt } => {
+        let (if_stmt, e_stmt): (Vec<Box<Statements>>, Vec<Box<Statements>>) = parse_if(lines, &mut *pointer, *line_indent)?;
+        *stmt = if_stmt;
+        *else_stmt = e_stmt;
+        result.push(Box::new(tokenized));
+      }
+      _ => result.push(Box::new(tokenized))
+    }
+    *pointer += 1;
+  }
+  Err(WoojinError::new("Parsing Else statement failed", crate::error::WoojinErrorKind::ElseParsingFailed))
+}
+
+pub(crate) fn tokenize_line(line: &impl ToString) -> WoojinResult<Statements> {
   let line: String = line.to_string().trim().to_string();
   match line {
     line if line == "" => Ok(Statements::Value { value: WoojinValue::String("".to_string()) }),
+    line if line.starts_with("if") => {
+      let (_, condition): (&str, &str) = parse_if_condition(&line)?;
+      let condition: Statements = tokenize_line(&condition.to_string())?;
+      Ok(Statements::If { condition: Box::new(condition), stmt: Vec::new(), else_stmt: Vec::new() })
+    },
+    line if line.starts_with("else") => {Ok(Statements::Value { value: WoojinValue::Unit })},
     line if line.starts_with("//") => Ok(Statements::Comment(line[2..].trim().to_string())),
     line if line.starts_with("yee") => match yee(&line)? { (_, a) => { return Ok(a); }, }
     line if line.starts_with("println") => Ok(println(&line)?),
@@ -171,7 +268,7 @@ pub(crate) fn tokenizer(line: &impl ToString) -> Result<Statements, crate::error
     line if line.starts_with("sleep") => Ok(sleep(&line)?),
     line if line.starts_with("let") => {
       let (_, (var_name, kind, input, mutable)): (&str, (String, String, &str, bool)) = parse_variable(&line)?;
-      let stmts: Statements = tokenizer(&input.to_string())?;
+      let stmts: Statements = tokenize_line(&input.to_string())?;
       Ok(Statements::Let {
         name: var_name,
         stmt: Box::new(stmts),
@@ -181,7 +278,7 @@ pub(crate) fn tokenizer(line: &impl ToString) -> Result<Statements, crate::error
     },
     line if line.starts_with("$") && line.contains("=") => {
       let (varname, value): (String, String) = parse_assignment(&line)?;
-      let stmts: Statements = tokenizer(&value)?;
+      let stmts: Statements = tokenize_line(&value)?;
       Ok(Statements::Assignment { name: varname, value: Box::new(stmts) })
     },
     _ => match parse_calc(line.as_str()) {

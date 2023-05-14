@@ -19,7 +19,11 @@ pub enum WoojinErrorKind {
   CannotDivide,
   DivisionByZero,
   InvalidType,
-  TypeMismatch
+  TypeMismatch,
+  InvalidIndent,
+  IfParsingFailed,
+  ElseParsingFailed,
+  InvaildAssignment
 }
 
 #[derive(Debug)]

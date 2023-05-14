@@ -14,6 +14,11 @@ pub(crate) enum Statements {
     stmt: Box<Statements>,
     option: VariableOption,
   },
+  If {
+    condition: Box<Statements>,
+    stmt: Vec<Box<Statements>>,
+    else_stmt: Vec<Box<Statements>>,
+  },
   Roar { value: WoojinValue },
   Yee { code: i32 },
   Value { value: WoojinValue },

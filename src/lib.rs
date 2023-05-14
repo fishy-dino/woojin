@@ -5,29 +5,53 @@ pub(crate) mod ast;
 pub(crate) mod parser;
 pub(crate) mod calc;
 
-use std::io::{Write};
+use std::{io::{Write}};
 use ast::Statements;
 use calc::{ValueCalc, Calc};
 use error::WoojinError;
 use nom::IResult;
-use parser::{WoojinResult};
+use parser::{WoojinResult, tokenizer};
 use types::WoojinValue;
+use variable::WoojinVariable;
 
 pub(crate) type NomResult<'a, T> = IResult<&'a str, T>;
 // pub(crate) type StdString = std::string::String;
 
-pub(crate) struct Program { statements: Vec<self::ast::Statements> }
-impl Program { pub fn new() -> Program { Program{ statements: Vec::new() } } }
-pub fn run(lines: Vec<String>) {
-  let mut program: Program = Program::new();
-  for line in lines {
-    let res: Result<Statements, error::WoojinError> = crate::parser::tokenizer(&line);
-    match res {
-      Ok(v) => {program.statements.push(v)},
-      Err(err) => { err.exit(); }
+#[allow(dead_code)]
+pub(crate) struct Program {
+  pub(crate) pointer: i32,
+  pub(crate) variables: Vec<WoojinVariable>,
+  pub(crate) statements: Vec<Statements>
+}
+
+impl Program {
+  pub fn new() -> Program {
+    Program {
+      pointer: 0,
+      variables: Vec::new(),
+      statements: Vec::new()
     }
   }
-  for stmt in program.statements.iter() { if let Err(err) = exec(stmt) { err.exit(); } }
+}
+
+pub fn run(value: Vec<(usize, String)>) {
+  let mut program: Program = Program::new();
+  let lines: Vec<(usize, String)> = value.iter().map(|(a,b)| (*a, b.to_string())).collect();
+  program.statements = match tokenizer(&lines) {
+    Ok(statements) => statements,
+    Err(e) => { e.exit(); }
+  };
+
+  run_program(&mut program);
+}
+
+pub(crate) fn run_program(program: &mut Program) {
+  for stmt in &program.statements {
+    match exec(stmt) {
+      Ok(_) => {},
+      Err(e) => { e.exit(); }
+    }
+  }
 }
 
 pub(crate) fn check_calc(calc: Calc) -> WoojinResult<WoojinValue> {
@@ -69,7 +93,7 @@ pub(crate) fn exec(stmt: &Statements) -> Result<WoojinValue, crate::error::Wooji
     Statements::Sleep { value } => {
       match exec(&**value)? {
         WoojinValue::Int(num) => std::thread::sleep(std::time::Duration::from_millis(num as u64)),
-        _ => WoojinError::new("The param of the sleep function must be an integer", error::WoojinErrorKind::Unknown).exit()
+        _ => WoojinError::new("The param of the sleep function must be an integer", error::WoojinErrorKind::TypeMismatch).exit()
       }
     },
     Statements::Assignment { name, value } => {
@@ -78,12 +102,20 @@ pub(crate) fn exec(stmt: &Statements) -> Result<WoojinValue, crate::error::Wooji
     },
     Statements::Let { name, stmt, kind, option } => { 
       let value: WoojinValue = exec(stmt)?;
-      if !value.type_eq(*kind) { return Err(WoojinError::new("The type of the value and the type of the variable are different", error::WoojinErrorKind::Unknown)); }
+      if !value.type_eq(*kind) { return Err(WoojinError::new("The type of the value and the type of the variable are different", error::WoojinErrorKind::TypeMismatch)); }
       variable::dec_var(name.as_str(), &value, option)?;
     },
     // Statements::If { condition: _, body: _ } => {}, 
     Statements::Value { value } => {
       return Ok(value.value().clone())
+    },
+    Statements::If { condition, stmt, else_stmt } => {
+      match exec(condition)? {
+        WoojinValue::Bool(b) => {
+          for s in if b { stmt } else { else_stmt } { exec(s)?; }
+        },
+        _ => { return Err(WoojinError::new("The condition of the if statement must be a boolean", error::WoojinErrorKind::TypeMismatch)); }
+      }
     },
     Statements::Calc(calc) => { return check_calc(calc.clone()); },
     Statements::Comment(_) => {}
