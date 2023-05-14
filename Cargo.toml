@@ -1,7 +1,7 @@
 [package]
 name = "woojin"
 authors = ["teamfishydino <teamfishydino@gmail.com>"]
-version = "0.1.4"
+version = "0.1.5"
 license = "AGPL-3.0"
 readme = "README.md"
 description = "Woojinlang interpreter written as Rust"
