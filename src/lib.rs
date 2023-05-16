@@ -60,6 +60,12 @@ pub(crate) fn check_calc(calc: Calc) -> WoojinResult<WoojinValue> {
     Calc::Sub(a, b) => Ok(check_calc(*a)?.sub(&check_calc(*b)?)?),
     Calc::Mul(a, b) => Ok(check_calc(*a)?.mul(&check_calc(*b)?)?),
     Calc::Div(a, b) => Ok(check_calc(*a)?.div(&check_calc(*b)?)?),
+    Calc::Equal(a, b) => Ok(check_calc(*a)?.equal(&check_calc(*b)?)?),
+    Calc::NotEqual(a, b) => Ok(check_calc(*a)?.not_equal(&check_calc(*b)?)?),
+    Calc::GreaterThan(a, b) => Ok(check_calc(*a)?.biggerthen(&check_calc(*b)?)?),
+    Calc::LessThan(a, b) => Ok(check_calc(*a)?.smallerthen(&check_calc(*b)?)?),
+    Calc::GreaterThanOrEqual(a, b) => Ok(check_calc(*a)?.biggerthen_equal(&check_calc(*b)?)?),
+    Calc::LessThanOrEqual(a, b) => Ok(check_calc(*a)?.smallerthen_equal(&check_calc(*b)?)?),
     Calc::Value(val) => return Ok(val.clone()),
   }
 }
@@ -97,8 +103,10 @@ pub(crate) fn exec(stmt: &Statements) -> Result<WoojinValue, crate::error::Wooji
       }
     },
     Statements::Assignment { name, value } => {
+      println!("{:?}!", value);
       let value: WoojinValue = exec(value)?;
       variable::change_var(name.as_str(), &value)?;
+      return Ok(value);
     },
     Statements::Let { name, stmt, kind, option } => { 
       let value: WoojinValue = exec(stmt)?;

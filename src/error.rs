@@ -23,7 +23,8 @@ pub enum WoojinErrorKind {
   InvalidIndent,
   IfParsingFailed,
   ElseParsingFailed,
-  InvaildAssignment
+  InvaildAssignment,
+  CannotCompare
 }
 
 #[derive(Debug)]

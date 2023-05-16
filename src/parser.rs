@@ -1,4 +1,5 @@
 use std::str::FromStr;
+use regex::Regex;
 
 use crate::{
   ast::Statements,
@@ -135,13 +136,13 @@ pub(crate) fn parse_variable(input: &str) -> IResult<&str, (String, String, &str
   Ok((input, (var_name, var_type, value, mutable)))
 }
 
-pub(crate) fn parse_assignment(input: &str) -> WoojinResult<(String, String)>{
-  let splited: Vec<String> = input.split("=").map(|a| a.to_string()).collect();
-  if splited.len() < 2 { return Err(WoojinError::new("Invalid assignment", crate::error::WoojinErrorKind::InvaildAssignment)); }
-  let (_, varname) = parse_variable_name(splited[0].trim())?;
-  let value: String = splited[1].trim().to_string();
-  Ok((varname, value))
-}
+// pub(crate) fn parse_assignment(input: &str) -> WoojinResult<(String, String)>{
+//   let splited: Vec<String> = input.split("=").map(|a| a.to_string()).collect();
+//   if splited.len() < 2 { return Err(WoojinError::new("Invalid assignment", crate::error::WoojinErrorKind::InvaildAssignment)); }
+//   let (_, varname) = parse_variable_name(splited[0].trim())?;
+//   let value: String = splited[1].trim().to_string();
+//   Ok((varname, value))
+// }
 
 fn parse_whitespace(input: &str) -> IResult<&str, &str> {
   take_while(|c: char| c.is_whitespace())(input)
@@ -249,14 +250,21 @@ pub(crate) fn parse_else(lines: &Vec<(usize, String)>, pointer: &mut usize, inde
   Err(WoojinError::new("Parsing Else statement failed", crate::error::WoojinErrorKind::ElseParsingFailed))
 }
 
-pub(crate) fn tokenize_line(line: &impl ToString) -> WoojinResult<Statements> {
+pub(crate) fn tokenize_line(line: &str) -> WoojinResult<Statements> {
   let line: String = line.to_string().trim().to_string();
+  let chvar_reg = Regex::new(r"(?m)\$[a-zA-Z_]{1}[a-zA-Z0-9_]*\s*=\s*").unwrap();
   match line {
     line if line == "" => Ok(Statements::Value { value: WoojinValue::String("".to_string()) }),
     line if line.starts_with("if") => {
       let (_, condition): (&str, &str) = parse_if_condition(&line)?;
       let condition: Statements = tokenize_line(&condition.to_string())?;
       Ok(Statements::If { condition: Box::new(condition), stmt: Vec::new(), else_stmt: Vec::new() })
+    },
+    line if chvar_reg.is_match(line.as_str()) => {
+      let splited = line.split("=").map(|a| a.to_string()).collect::<Vec<String>>();
+      let (_, varname) = parse_variable_name(splited[0].trim())?;
+      let stmts: Statements = tokenize_line(splited[1..].join("=").trim())?;
+      Ok(Statements::Assignment { name: varname, value: Box::new(stmts) })
     },
     line if line.starts_with("else") => {Ok(Statements::Value { value: WoojinValue::Unit })},
     line if line.starts_with("//") => Ok(Statements::Comment(line[2..].trim().to_string())),
@@ -275,11 +283,6 @@ pub(crate) fn tokenize_line(line: &impl ToString) -> WoojinResult<Statements> {
         kind: if kind.is_empty() { WoojinValueKind::Any } else { WoojinValueKind::from_str(&kind)? },
         option: VariableOption::new(Some(mutable), None)
       })
-    },
-    line if line.starts_with("$") && line.contains("=") => {
-      let (varname, value): (String, String) = parse_assignment(&line)?;
-      let stmts: Statements = tokenize_line(&value)?;
-      Ok(Statements::Assignment { name: varname, value: Box::new(stmts) })
     },
     _ => match parse_calc(line.as_str()) {
       Ok(val) => {

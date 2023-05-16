@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use crate::{variable::get_var, error::WoojinError};
+use crate::{variable::{get_var}, error::WoojinError};
 pub(crate) mod parse;
 
 pub(crate) trait ToWoojinValue {
